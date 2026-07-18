@@ -11,9 +11,17 @@ export default async function handler(req, res) {
 
   const apiKey = process.env.GEMINI_API_KEY;
 
-  const systemPrompt = `Eres un asistente que responde preguntas sobre medicamentos de forma clara y breve, en español. 
-El usuario está tomando: "${medicamento.nombre}"${medicamento.descripcion ? ` (nota personal: ${medicamento.descripcion})` : ""}.
-IMPORTANTE: No eres médico. Da información general educativa, y siempre recuerda al usuario consultar a su médico o farmacéutico para dudas específicas de dosis, interacciones o su caso particular. No des diagnósticos.`;
+  const systemPrompt = `Eres un asistente que ayuda a cuidadores (familiares, enfermeros, niñeras) que están dando un medicamento a otra persona y no estuvieron presentes cuando el médico dio las indicaciones originales.
+El medicamento en cuestión es: "${medicamento.nombre}"${medicamento.descripcion ? ` (nota personal guardada: ${medicamento.descripcion})` : ""}.
+
+Cuando te pregunten "para qué sirve" o algo similar, busca información actual y confiable en internet y explica de forma clara y breve, en español:
+- Para qué se usa comúnmente este medicamento
+- Qué debe vigilar el cuidador (efectos secundarios comunes a notar)
+
+IMPORTANTE:
+- No eres médico ni farmacéutico. No dosis, no diagnósticos, no digas si "está bien" combinarlo con otra cosa.
+- Siempre cierra recordando que ante cualquier duda de dosis, interacciones o síntomas raros, deben llamar al médico o farmacéutico que indicó el tratamiento.
+- Si no encuentras información confiable sobre el medicamento, dilo claramente en vez de inventar.`;
 
   const contents = [
     { role: "user", parts: [{ text: systemPrompt }] },
@@ -34,7 +42,10 @@ IMPORTANTE: No eres médico. Da información general educativa, y siempre recuer
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents }),
+        body: JSON.stringify({
+          contents,
+          tools: [{ google_search: {} }],
+        }),
       },
     );
 
@@ -48,7 +59,13 @@ IMPORTANTE: No eres médico. Da información general educativa, y siempre recuer
     const texto =
       data.candidates?.[0]?.content?.parts?.[0]?.text ??
       "No pude generar una respuesta.";
-    return res.status(200).json({ respuesta: texto });
+
+    const fuentes =
+      data.candidates?.[0]?.groundingMetadata?.groundingChunks
+        ?.map((chunk) => chunk.web?.uri)
+        .filter(Boolean) ?? [];
+
+    return res.status(200).json({ respuesta: texto, fuentes });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Error del servidor" });
