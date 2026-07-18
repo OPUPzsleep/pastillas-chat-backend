@@ -1,8 +1,3 @@
 {
-  "buildCommand": null,
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  }
+  "buildCommand": null
 }
